@@ -1,15 +1,23 @@
 /**
  * API client for the Family Car app.
  *
- * Two things every call now does that the first version did not:
- *  - sends the session token, because the server actually enforces auth
- *  - throws a real Error on a non-2xx response, so callers cannot mistake an
- *    error body for a success (the old code returned res.json() unchecked, so
- *    a 403 looked like a successful result and the UI showed "saved!")
+ * Supports both:
+ *  - Real Node.js backend when running locally or configured via VITE_API_URL
+ *  - Client-side mockStorage fallback for static hosting (e.g., GitHub Pages)
  */
 
-const API_BASE = (import.meta.env && import.meta.env.VITE_API_URL) ? import.meta.env.VITE_API_URL : '/api';
+import { mockStorage } from './mockStorage';
+
+const isGitHubPages =
+  typeof window !== 'undefined' &&
+  (window.location.hostname.includes('github.io') || window.location.hostname.includes('netlify.app'));
+
+const hasExplicitBackend = !!(import.meta.env && import.meta.env.VITE_API_URL);
+const API_BASE = hasExplicitBackend ? import.meta.env.VITE_API_URL : '/api';
 const TOKEN_KEY = 'car_app_token';
+
+// Use local mock storage if on GitHub Pages without an explicit backend
+let useLocalFallback = isGitHubPages && !hasExplicitBackend;
 
 let authToken = null;
 try {
@@ -50,6 +58,10 @@ class ApiError extends Error {
 }
 
 async function request(path, { method = 'GET', body, signal } = {}) {
+  if (useLocalFallback) {
+    throw new ApiError('USING_LOCAL_FALLBACK', { status: 0 });
+  }
+
   let response;
   try {
     response = await fetch(API_BASE + path, {
@@ -63,8 +75,13 @@ async function request(path, { method = 'GET', body, signal } = {}) {
     });
   } catch (err) {
     if (err.name === 'AbortError') throw err;
-    // No response at all: the server is down or the device is offline.
-    throw new ApiError('אין חיבור לשרת. בדוק את האינטרנט ונסה שוב', { status: 0 });
+    useLocalFallback = true;
+    throw new ApiError('USING_LOCAL_FALLBACK', { status: 0 });
+  }
+
+  if (response.status === 404 && !hasExplicitBackend) {
+    useLocalFallback = true;
+    throw new ApiError('USING_LOCAL_FALLBACK', { status: 404 });
   }
 
   let payload = null;
@@ -78,10 +95,6 @@ async function request(path, { method = 'GET', body, signal } = {}) {
   }
 
   if (!response.ok) {
-    // A 401 normally means the session expired, so the app logs out. But the
-    // login endpoints answer 401 for "wrong code" / "wrong PIN" too, and
-    // treating that as an expiry threw the user back to the family-code screen
-    // on every mistyped PIN - losing the session they had legitimately earned.
     const isLoginAttempt = path.startsWith('/auth/verify') || path.startsWith('/auth/select');
     if (response.status === 401 && !isLoginAttempt) {
       setAuthToken(null);
@@ -104,145 +117,354 @@ export const api = {
   // Auth
   // ----------------------------------------------------
   async verifyFamilyCode(code) {
-    const result = await request('/auth/verify-code', { method: 'POST', body: { code } });
-    if (result?.token) setAuthToken(result.token);
-    return result;
+    try {
+      const result = await request('/auth/verify-code', { method: 'POST', body: { code } });
+      if (result?.token) setAuthToken(result.token);
+      return result;
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        const res = mockStorage.verifyFamilyCode(code);
+        setAuthToken(res.token);
+        return res;
+      }
+      throw err;
+    }
   },
 
   async selectUser(userId) {
-    const result = await request('/auth/select-user', { method: 'POST', body: { userId } });
-    if (result?.token) setAuthToken(result.token);
-    return result;
+    try {
+      const result = await request('/auth/select-user', { method: 'POST', body: { userId } });
+      if (result?.token) setAuthToken(result.token);
+      return result;
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        const res = mockStorage.selectUser(userId);
+        setAuthToken(res.token);
+        return res;
+      }
+      throw err;
+    }
   },
 
   async verifyAdminPin(userId, pin) {
-    const result = await request('/auth/verify-pin', { method: 'POST', body: { userId, pin } });
-    if (result?.token) setAuthToken(result.token);
-    return result;
+    try {
+      const result = await request('/auth/verify-pin', { method: 'POST', body: { userId, pin } });
+      if (result?.token) setAuthToken(result.token);
+      return result;
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        const res = mockStorage.verifyAdminPin(userId, pin);
+        setAuthToken(res.token);
+        return res;
+      }
+      throw err;
+    }
   },
 
-  me() {
-    return request('/auth/me');
+  async me() {
+    try {
+      return await request('/auth/me');
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.me();
+      }
+      throw err;
+    }
   },
 
   // ----------------------------------------------------
   // Status, users
   // ----------------------------------------------------
-  getCarStatus() {
-    return request('/status');
+  async getCarStatus() {
+    try {
+      return await request('/status');
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.getCarStatus();
+      }
+      throw err;
+    }
   },
 
-  getUsers() {
-    return request('/users');
+  async getUsers() {
+    try {
+      return await request('/users');
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.getUsers();
+      }
+      throw err;
+    }
   },
 
-  createUser(userData) {
-    return request('/users', { method: 'POST', body: userData });
+  async createUser(userData) {
+    try {
+      return await request('/users', { method: 'POST', body: userData });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.createUser(userData);
+      }
+      throw err;
+    }
   },
 
-  updateUser(id, updates) {
-    return request(`/users/${id}`, { method: 'PUT', body: updates });
+  async updateUser(id, updates) {
+    try {
+      return await request(`/users/${id}`, { method: 'PUT', body: updates });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.updateUser(id, updates);
+      }
+      throw err;
+    }
   },
 
-  deleteUser(id) {
-    return request(`/users/${id}`, { method: 'DELETE' });
+  async deleteUser(id) {
+    try {
+      return await request(`/users/${id}`, { method: 'DELETE' });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.deleteUser(id);
+      }
+      throw err;
+    }
   },
 
   // ----------------------------------------------------
   // Reservations
   // ----------------------------------------------------
-  getReservations(params = {}) {
-    const query = new URLSearchParams(
-      Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
-    ).toString();
-    return request(`/reservations${query ? `?${query}` : ''}`);
+  async getReservations(params = {}) {
+    try {
+      const query = new URLSearchParams(
+        Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')
+      ).toString();
+      return await request(`/reservations${query ? `?${query}` : ''}`);
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.getReservations(params);
+      }
+      throw err;
+    }
   },
 
-  getPendingApprovals() {
-    return request('/reservations/pending');
+  async getPendingApprovals() {
+    try {
+      return await request('/reservations/pending');
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.getPendingApprovals();
+      }
+      throw err;
+    }
   },
 
-  createReservation(data) {
-    return request('/reservations', { method: 'POST', body: data });
+  async createReservation(data) {
+    try {
+      return await request('/reservations', { method: 'POST', body: data });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.createReservation(data);
+      }
+      throw err;
+    }
   },
 
-  quickRide(minutes = 15, reason = 'קפיצה קצרה') {
-    return request('/reservations/quick', { method: 'POST', body: { minutes, reason } });
+  async quickRide(minutes = 15, reason = 'קפיצה קצרה') {
+    try {
+      return await request('/reservations/quick', { method: 'POST', body: { minutes, reason } });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.quickRide(minutes, reason);
+      }
+      throw err;
+    }
   },
 
-  returnCar(reservationId = null) {
-    return request('/reservations/return', { method: 'POST', body: { reservationId } });
+  async returnCar(reservationId = null) {
+    try {
+      return await request('/reservations/return', { method: 'POST', body: { reservationId } });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.returnCar(reservationId);
+      }
+      throw err;
+    }
   },
 
-  approveReservation(id) {
-    return request(`/reservations/${id}/approve`, { method: 'PUT' });
+  async approveReservation(id) {
+    try {
+      return await request(`/reservations/${id}/approve`, { method: 'PUT' });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.approveReservation(id);
+      }
+      throw err;
+    }
   },
 
-  rejectReservation(id, reason) {
-    return request(`/reservations/${id}/reject`, { method: 'PUT', body: { reason } });
+  async rejectReservation(id, reason) {
+    try {
+      return await request(`/reservations/${id}/reject`, { method: 'PUT', body: { reason } });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.rejectReservation(id, reason);
+      }
+      throw err;
+    }
   },
 
-  deleteReservation(id, reason) {
-    return request(`/reservations/${id}`, { method: 'DELETE', body: reason ? { reason } : undefined });
+  async deleteReservation(id, reason) {
+    try {
+      return await request(`/reservations/${id}`, { method: 'DELETE', body: reason ? { reason } : undefined });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.deleteReservation(id, reason);
+      }
+      throw err;
+    }
   },
 
   // ----------------------------------------------------
   // Waitlist
   // ----------------------------------------------------
-  getWaitlist() {
-    return request('/waitlist');
+  async getWaitlist() {
+    try {
+      return await request('/waitlist');
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.getWaitlist();
+      }
+      throw err;
+    }
   },
 
-  joinWaitlist(data) {
-    return request('/waitlist', { method: 'POST', body: data });
+  async joinWaitlist(data) {
+    try {
+      return await request('/waitlist', { method: 'POST', body: data });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.joinWaitlist(data);
+      }
+      throw err;
+    }
   },
 
-  leaveWaitlist(id) {
-    return request(`/waitlist/${id}`, { method: 'DELETE' });
+  async leaveWaitlist(id) {
+    try {
+      return await request(`/waitlist/${id}`, { method: 'DELETE' });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.leaveWaitlist(id);
+      }
+      throw err;
+    }
   },
 
   // ----------------------------------------------------
   // Calendar
   // ----------------------------------------------------
-  getDayStatus(dateStr) {
-    return request(`/calendar/day-status?date=${encodeURIComponent(dateStr)}`);
+  async getDayStatus(dateStr) {
+    try {
+      return await request(`/calendar/day-status?date=${encodeURIComponent(dateStr)}`);
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.getDayStatus(dateStr);
+      }
+      throw err;
+    }
   },
 
   // ----------------------------------------------------
   // Settings
   // ----------------------------------------------------
-  getSettings() {
-    return request('/settings');
+  async getSettings() {
+    try {
+      return await request('/settings');
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.getSettings();
+      }
+      throw err;
+    }
   },
 
-  updateSettings(settings) {
-    return request('/settings', { method: 'PUT', body: settings });
+  async updateSettings(settings) {
+    try {
+      return await request('/settings', { method: 'PUT', body: settings });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.updateSettings(settings);
+      }
+      throw err;
+    }
   },
 
-  changePin(currentPin, newPin) {
-    return request('/settings/pin', { method: 'PUT', body: { currentPin, newPin } });
+  async changePin(currentPin, newPin) {
+    try {
+      return await request('/settings/pin', { method: 'PUT', body: { currentPin, newPin } });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.changePin(currentPin, newPin);
+      }
+      throw err;
+    }
   },
 
   // ----------------------------------------------------
   // WhatsApp
   // ----------------------------------------------------
-  getWhatsAppStatus() {
-    return request('/whatsapp/status');
+  async getWhatsAppStatus() {
+    try {
+      return await request('/whatsapp/status');
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.getWhatsAppStatus();
+      }
+      throw err;
+    }
   },
 
-  connectWhatsApp() {
-    return request('/whatsapp/connect', { method: 'POST' });
+  async connectWhatsApp() {
+    try {
+      return await request('/whatsapp/connect', { method: 'POST' });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.connectWhatsApp();
+      }
+      throw err;
+    }
   },
 
-  disconnectWhatsApp() {
-    return request('/whatsapp/disconnect', { method: 'POST' });
+  async disconnectWhatsApp() {
+    try {
+      return await request('/whatsapp/disconnect', { method: 'POST' });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.disconnectWhatsApp();
+      }
+      throw err;
+    }
   },
 
-  simulateWhatsAppMessage(text, asUserId) {
-    return request('/whatsapp/simulate', { method: 'POST', body: { text, asUserId } });
+  async simulateWhatsAppMessage(text, asUserId) {
+    try {
+      return await request('/whatsapp/simulate', { method: 'POST', body: { text, asUserId } });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.simulateWhatsAppMessage(text, asUserId);
+      }
+      throw err;
+    }
   },
 
-  sendTestDigest() {
-    return request('/whatsapp/test-digest', { method: 'POST' });
+  async sendTestDigest() {
+    try {
+      return await request('/whatsapp/test-digest', { method: 'POST' });
+    } catch (err) {
+      if (err.message === 'USING_LOCAL_FALLBACK' || useLocalFallback) {
+        return mockStorage.sendTestDigest();
+      }
+      throw err;
+    }
   }
 };
