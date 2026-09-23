@@ -1,0 +1,19 @@
+# Secrets - NEVER commit these
+.env
+.env.local
+
+# WhatsApp session data. This folder is a live login to the linked WhatsApp
+# account: committing it hands anyone with repo access the family's WhatsApp.
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Local database (family names, phone numbers, PIN hashes, install secret)
+data/
+*.corrupt-*
+*.tmp
+
+node_modules/
+npm-debug.log*
+logs/
+*.log
+.DS_Store

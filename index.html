@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      viewport-fit=cover lets the app fill the screen under the notch and the
+      home indicator. Every fixed edge (header, tab bar) pads itself back out
+      with env(safe-area-inset-*) - see .pt-safe / .pb-safe-nav in index.css.
+
+      user-scalable=no and maximum-scale=1 were removed: blocking pinch zoom is
+      a WCAG 1.4.4 failure, and iOS Safari ignores it anyway.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="description" content="שריון ותיאום הרכב המשפחתי, עם התראות בוואטסאפ" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
+
+    <!-- iOS standalone -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="רכב משפחתי" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+
+    <!-- Icons -->
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+
+    <!-- Fonts. Only Heebo is loaded now: Rubik was being downloaded on every
+         visit and never referenced by any rule. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>רכב משפחתי</title>
+    <script type="module" crossorigin src="./assets/index-D0r0ZTzf.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-BnYcs5ha.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
