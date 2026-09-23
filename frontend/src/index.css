@@ -1,0 +1,282 @@
+@import "tailwindcss";
+
+/* ===================================================================
+   Dark mode
+   Tailwind v4 maps `dark:` to prefers-color-scheme by DEFAULT. Without this
+   custom variant the in-app dark toggle did nothing: the .dark class was added
+   to <html>, the hand-written `.dark .glass-card` rules applied and turned the
+   cards near-black, but every `dark:text-*` utility stayed behind a media
+   query - producing near-black text on near-black cards.
+   This one line is what makes the toggle work.
+   =================================================================== */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ===================================================================
+   Design tokens - Apple-native deep blue on black
+   =================================================================== */
+@theme {
+  --font-sans: 'Heebo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Brand blue, tuned so text on it clears 4.5:1 on both themes */
+  --color-brand-50: #eff6ff;
+  --color-brand-100: #dbeafe;
+  --color-brand-200: #bfdbfe;
+  --color-brand-300: #93c5fd;
+  --color-brand-400: #60a5fa;
+  --color-brand-500: #0a84ff;  /* iOS system blue, dark mode */
+  --color-brand-600: #0071e3;  /* Apple blue, light mode */
+  --color-brand-700: #0059b2;
+  --color-brand-800: #004480;
+  --color-brand-900: #003166;
+
+  /* Surfaces */
+  --color-ink-950: #000000;
+  --color-ink-900: #0a0a0c;
+  --color-ink-850: #121214;
+  --color-ink-800: #1c1c20;
+  --color-ink-700: #2c2c32;
+
+  --radius-apple: 1.25rem;
+
+  /* Apple's standard spring for press feedback */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-apple: cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+@layer base {
+  html {
+    /* dvh, not vh: iOS Safari's toolbar makes 100vh taller than the viewport */
+    min-height: 100dvh;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+    min-height: 100dvh;
+    /* 16px base: anything smaller makes iOS auto-zoom on focus */
+    font-size: 16px;
+    line-height: 1.5;
+  }
+
+  /* Chrome, not content: letting the user select the tab bar label feels wrong,
+     but selecting a reason or a phone number must stay possible. */
+  nav, header, button, [role="tab"] {
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  input, textarea, select {
+    user-select: text;
+    -webkit-user-select: text;
+    /* 16px prevents the iOS focus zoom that shifts the whole layout */
+    font-size: 16px;
+  }
+
+  /* A visible focus ring on keyboard navigation only - never removed. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-600);
+    outline-offset: 2px;
+    border-radius: 0.5rem;
+  }
+  .dark :focus-visible {
+    outline-color: var(--color-brand-400);
+  }
+
+  /* Times and durations line up in columns. */
+  time, .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ===================================================================
+   Glass surfaces
+   =================================================================== */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.dark .glass-panel {
+  background: rgba(18, 18, 20, 0.78);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  /* Layered shadow: a tight contact shadow plus a soft ambient one */
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 4px 16px -4px rgba(0, 0, 0, 0.06);
+}
+
+.dark .glass-card {
+  background: rgba(28, 28, 32, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.3),
+    0 8px 24px -6px rgba(0, 0, 0, 0.5);
+}
+
+.glass-sheet {
+  background: rgba(250, 250, 252, 0.94);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+}
+
+.dark .glass-sheet {
+  background: rgba(24, 24, 27, 0.94);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+}
+
+/* ===================================================================
+   Press feedback - subtle scale, the way iOS does it
+   =================================================================== */
+.apple-btn-active {
+  transition: transform 0.18s var(--ease-spring), background-color 0.18s ease,
+    opacity 0.18s ease, border-color 0.18s ease;
+  touch-action: manipulation; /* kills the 300ms tap delay */
+}
+
+.apple-btn-active:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+.apple-press-card:active {
+  transform: scale(0.985);
+  transition: transform 0.18s var(--ease-spring);
+}
+
+/* ===================================================================
+   Safe areas (iOS notch, Dynamic Island, home indicator)
+   index.html sets viewport-fit=cover, so the web view extends under both,
+   and every fixed edge has to pad itself out of the way.
+   =================================================================== */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.pb-safe-nav {
+  /* The bottom bar's own padding plus the home-indicator inset */
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+}
+.mb-safe-content {
+  /* Clearance so the tab bar - including the raised + button that sits 28px
+     above it - never covers the last card. */
+  margin-bottom: calc(env(safe-area-inset-bottom, 0px) + 8rem);
+}
+/* max(), not a plain env(): a bare env() value is 0 on most devices, and
+   because this class lands later in the cascade than Tailwind's px-4 it was
+   wiping the gutter out entirely and letting cards run to the screen edge. */
+.px-safe {
+  padding-left: max(1rem, env(safe-area-inset-left, 0px));
+  padding-right: max(1rem, env(safe-area-inset-right, 0px));
+}
+
+/* ===================================================================
+   Scrollbars
+   =================================================================== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(150, 150, 150, 0.35);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(150, 150, 150, 0.55);
+}
+
+/* ===================================================================
+   Motion
+   =================================================================== */
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes shimmer {
+  100% { transform: translateX(-100%); } /* RTL: sweeps right to left */
+}
+
+.animate-sheet-up {
+  animation: sheet-up 0.34s var(--ease-out-apple);
+}
+.animate-fade-in {
+  animation: fade-in 0.22s ease-out;
+}
+.animate-pop-in {
+  animation: pop-in 0.26s var(--ease-spring);
+}
+
+/* Skeleton placeholder for loading states */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.06);
+}
+.dark .skeleton {
+  background: rgba(255, 255, 255, 0.07);
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.35),
+    transparent
+  );
+  animation: shimmer 1.4s infinite;
+}
+.dark .skeleton::after {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.07),
+    transparent
+  );
+}
+
+/* Respect the system setting. Everything stays usable, just still. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .apple-btn-active:active:not(:disabled),
+  .apple-press-card:active {
+    transform: none;
+  }
+  .skeleton::after {
+    animation: none;
+  }
+}

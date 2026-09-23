@@ -1,0 +1,42 @@
+# Root Git Ignore for Family Car App
+
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Secrets & Environment variables
+.env
+.env.*
+!.env.example
+*.env
+*/.env*
+!*/.env.example
+
+# WhatsApp Session Auth (CRITICAL - NEVER COMMIT)
+.wwebjs_auth/
+.wwebjs_cache/
+*/.wwebjs_auth/
+*/.wwebjs_cache/
+
+# Local databases & user data
+data/
+*/data/
+*.db
+*.sqlite
+*.corrupt-*
+
+# Builds & Outputs
+dist/
+dist-ssr/
+*/dist/
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
